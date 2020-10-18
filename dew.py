@@ -5,11 +5,13 @@
 #       using the DO api
 # AUTHOR: https://github.com/chadpierce
 # USAGE:
-#   create droplet: python3 do.py 
-#   delete droplet: python3 do.py -d dropletID
-#   list droplets: python3 do.py -l
+#   create droplet: python3 dew.py -c
+#   delete droplet: python3 dew.py -d dropletID 
+#   list droplets: python3 dew.py -l
+#   list available images: python3 dew.py -i
+#   show help: python3 dew.py -h
 #
-# TODO: user input droplet name instead of hard coded
+# TODO user data is iffy and needs testing
 ##################################################
 import sys
 import time
@@ -21,13 +23,21 @@ import json
 # tags - use to automatically assign firewalls, etc
 
 # vvv change this stuff vvv
-api_token = 'TOKEN_HERE'
-ssh_key_fingerprint = 'FINGERPRINT_HERE'
-droplet_name = 'NAME_HERE'
+api_token = '<YOUR TOKEN>'
+ssh_key_fingerprint = '<YOUR FINGERPRINT>'
+safe_droplets = [123, 456]  # ids of droplets you dont want to delete
+droplet_name = 'pwnbox'  # default if you leave input blank
 droplet_size = 's-1vcpu-1gb'  #cheapest $5 droplet
-droplet_image = 'ubuntu-20-04-x64'  #ubuntu for simplicity 
-tag = 'TAG_HERE'
+droplet_image = 'debian-10-x64'  # 'ubuntu-20-04-x64'
+tag = 'pwn'
 region = 'tor1'
+user_data = ''  # this is populated in create_droplet()
+auto_script = '''#!/bin/bash
+
+apt-get -y update
+apt-get -y install nmap wget curl tmux
+touch /root/donezo
+'''
 # ^^^ change that stuff ^^^
 
 headers = {
@@ -43,25 +53,36 @@ data = '{ \
     "ssh_keys":["' + ssh_key_fingerprint + '"], \
     "backups":false, \
     "ipv6":false, \
-    "user_data":null, \
+    "user_data":"' + user_data + '", \
     "private_networking":null, \
     "volumes": null, \
     "tags":["' + tag + '"] \
 }'
 
 
-def add_droplet():
+def create_droplet():
+    global droplet_name
+    name_drop = input('enter droplet name (default is ' + droplet_name + ') => ')
+    if name_drop != '':
+        droplet_name = name_drop
+    do_auto = input('include automated script (may not work)? (y or n) => ')
+    if do_auto == 'n':
+        user_data = ''
+    elif do_auto == 'y':
+        user_data = auto_script
+    else:
+        print('that was not y or n')
+        sys.exit()
     response = requests.post('https://api.digitalocean.com/v2/droplets', headers=headers, data=data)
     jresp = response.json()
     droplet_id = jresp['droplet']['id']
     print('will generate droplet then sleep before getting IP...')
     print()
     print('droplet id: ' + str(droplet_id))
-    time.sleep(10)  # no idea how long this could take so playing it safe
+    time.sleep(10)
     response = requests.get('https://api.digitalocean.com/v2/droplets/' + str(droplet_id) + '/', headers=headers)
     jresp = response.json()
-    # not sure if public is always in the same position
-    ip1 = jresp['droplet']['networks']['v4'][0]['ip_address']
+    ip1 = jresp['droplet']['networks']['v4'][0]['ip_address']  # TODO make this better
     iptype1 = jresp['droplet']['networks']['v4'][0]['type']
     ip2 = jresp['droplet']['networks']['v4'][1]['ip_address']
     iptype2 = jresp['droplet']['networks']['v4'][1]['type']
@@ -70,24 +91,57 @@ def add_droplet():
     elif iptype2 == 'public':
         print('public ip: ' + str(ip2))
     else:
-        print('error: no public ip? printing all ip4 info')
+        print('ERROR: no public ip? printing all ip4 info')
         print(jresp['droplet']['networks']['v4'])
 
 
 def del_droplet(drop_id):
-    response = requests.delete('https://api.digitalocean.com/v2/droplets/' + drop_id, headers=headers)
-    if response.status_code == 204:
-        print('droplet deleted')
+    if int(drop_id) in safe_droplets:
+        print('you dont want to delete that one!')
     else:
-        print('something went wrong!')
+        response = requests.delete('https://api.digitalocean.com/v2/droplets/' + drop_id, headers=headers)
+        if response.status_code == 204:
+            print('droplet deleted')
+        else:
+            print('ERROR: something went wrong!')
 
 
 def list_droplets():
     response = requests.get('https://api.digitalocean.com/v2/droplets', headers=headers)
     jresp = response.json()
-    #print(jresp)
+    ipaddr = 'error: public ip not found' 
+    print('name\t\tid\t\tip\n----------\t----------\t--------------')
     for d in jresp['droplets']:
-        print(d['name'] + ' - ' + str(d['id']))
+        for i in range(len(d['networks']['v4'])):
+            if d['networks']['v4'][i]['type'] == 'public':
+                ipaddr = d['networks']['v4'][i]['ip_address']
+        print(d['name'] + '\t\t' + str(d['id']) + '\t' + str(ipaddr))
+
+
+def list_images():
+    response = requests.get('https://api.digitalocean.com/v2/images', headers=headers)
+    jresp = response.json()
+    image_list = []
+    for image in jresp['images']:
+        for _ in range(len(image)):
+            image_list.append(image['description'] + ' -- ' + image['slug'])
+    res = []  # remove duplicates 
+    [res.append(x) for x in image_list if x not in res]
+    print(*res, sep='\n')
+
+
+def print_help():
+    help_str = '''
+    dew.py switches:
+      -c        create droplet
+      -d id     delete droplet
+      -l        list existing droplets
+      -i        list available images
+      -h        print this help
+      '''
+    print(help_str)
+
+# start script        
 if len(sys.argv) > 1:
     if sys.argv[1] == '-d':
         if len(sys.argv) == 3:
@@ -97,10 +151,17 @@ if len(sys.argv) > 1:
                 print('bad droplet id!')
         else:
             print('you need a droplet id to delete a droplet')
-    elif sys.argv[1] == '-l':
+    elif sys.argv[1] == '-l' or sys.argv[1] == 'what':
         list_droplets()
+    elif sys.argv[1] == '-c' or sys.argv[1] == 'create':
+        create_droplet()
+    elif sys.argv[1] == '-i':
+        list_images()
+    elif sys.argv[1] == '-h':
+        print_help()
     else:
         print('bad switch try again')
+elif len(sys.argv) == 1:
+    print_help()
 else:
-    print('creating droplet...')
     add_droplet()
