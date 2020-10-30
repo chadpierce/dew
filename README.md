@@ -8,6 +8,10 @@ simple digital ocean droplet creator, destroyer, and lister
  - list available droplet images 
  - note: the automation script is currently broken (i think it needs newlines)
 
+TODO: 
+ - fix automation script
+ - add private ips for list and during creation 
+
 ## Usage:                                                                                                                                            
  - create droplet: python3 dew.py -c (some options hardcoded - edit varialbes in script to modify)                                                                                       
  - destroy droplet: python3 dew.py -d dropletID                                                                                                      
