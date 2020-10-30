@@ -6,6 +6,7 @@ simple digital ocean droplet creator, destroyer, and lister
  - safe delete - add list of droplets you don't want to accidentally destroy
  - list existing droplets
  - list available droplet images 
+ - note: the automation script is currently broken (i think it needs newlines)
 
 ## Usage:                                                                                                                                            
  - create droplet: python3 dew.py -c (some options hardcoded - edit varialbes in script to modify)                                                                                       
