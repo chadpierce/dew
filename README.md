@@ -6,13 +6,10 @@ simple digital ocean droplet creator, destroyer, and lister
  - safe delete - add list of droplets you don't want to accidentally destroy
  - list existing droplets
  - list available droplet images 
- - note: the automation script is currently broken (i think it needs newlines)
+ - includes optional automation script to kick off apt installations, etc at droplet creation
 
-TODO: 
- - fix automation script
- - add private ips for list and during creation 
-
-## Usage:                                                                                                                                            
+## Usage:  
+ - update vars in script wish api key, etc
  - create droplet: python3 dew.py -c (some options hardcoded - edit varialbes in script to modify)                                                                                       
  - destroy droplet: python3 dew.py -d dropletID                                                                                                      
  - list droplets: python3 dew.py -l
@@ -20,6 +17,7 @@ TODO:
  - show help: python3 dew.py -h
 
 ## how to get token, ssh keys, etc:
+ In Digital Ocean console:
  - api_token - accounts > api > generate new token                                                                                                   
  - sh_keys - settings > security > SSH Keys                                                                                                         
  - tags - assign tags to machines to automatically assign firewalls, etc
